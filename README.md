@@ -1,6 +1,6 @@
 # Codex Usage Monitor
 
-Local dashboard for understanding how your Codex usage is actually being spent.
+Local dashboard for inspecting where your Codex usage appears to be going.
 
 Codex already shows overall usage. This tool adds a clearer local view of:
 
@@ -12,6 +12,12 @@ Codex already shows overall usage. This tool adds a clearer local view of:
 - measured vs inferred confidence
 
 It reads your local Codex data from `~/.codex` and serves a browser dashboard from your machine. No external API is required.
+
+For example, it can make patterns visible like:
+
+- one project quietly consuming most of your tokens
+- `xhigh` and subagents dominating a specific task type
+- heavy sessions clustering on a single day
 
 ![Sanitized dashboard preview](assets/dashboard-preview.svg)
 
@@ -37,6 +43,8 @@ Then open:
 
 - `http://127.0.0.1:8765/index.html`
 
+`serve` is localhost-only by default. If you intentionally want LAN access, pass `--host 0.0.0.0`.
+
 Useful commands:
 
 ```bash
@@ -44,6 +52,11 @@ python3 scripts/codex_usage_monitor.py list --days 21 --limit 20
 python3 scripts/codex_usage_monitor.py report --days 21 --limit 30
 python3 scripts/codex_usage_monitor.py serve --days 21 --limit 30 --refresh-seconds 60
 ```
+
+Compatibility:
+
+- Python 3.10+
+- macOS-specific launchd example included, but the core script is plain Python
 
 ## How It Works
 
@@ -62,7 +75,10 @@ The browser page is the main interface. The CLI can also write:
 
 - `tmp/codex_usage/latest-report.md`
 - `tmp/codex_usage/latest-report.json`
-- `tmp/codex_usage/index.html`
+- `tmp/codex_usage/dashboard.html` from `report`
+- `tmp/codex_usage/index.html` from `serve`
+
+If you want project inference to be more meaningful, run the tool from a stable parent directory that contains your projects or pass `--workspace-root /path/to/projects`.
 
 ## Read The Dashboard In This Order
 
@@ -84,8 +100,11 @@ For a login-managed local monitor, this repo includes:
 
 The launchd template uses port `8769` by default so it stays separate from ad hoc test servers.
 
+The template is intentionally localhost-only.
+
 ## Notes
 
 - Python standard library only. No extra dependencies.
 - The dashboard uses your real local Codex data, so generated output should be treated as personal workspace data.
 - The preview image in this README is sanitized and does not contain real session data.
+- The repo does not yet include a license file. Decide that before broad public reuse is encouraged.

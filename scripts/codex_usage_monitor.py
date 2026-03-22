@@ -210,7 +210,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--codex-home", default=str(DEFAULT_CODEX_HOME))
     parser.add_argument("--ratings-path", default=str(DEFAULT_RATINGS_PATH))
     parser.add_argument("--timezone", default=DEFAULT_TIMEZONE)
-    parser.add_argument("--workspace-root", default=".")
+    parser.add_argument(
+        "--workspace-root",
+        default=".",
+        help="Workspace root used for project inference. Point this at the parent directory that contains your projects.",
+    )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -226,7 +230,7 @@ def parse_args() -> argparse.Namespace:
     rate_parser.add_argument("--notes", default="")
     rate_parser.add_argument("--latest", type=int, default=8)
 
-    report_parser = subparsers.add_parser("report", help="Build a Markdown and JSON advice report.")
+    report_parser = subparsers.add_parser("report", help="Build a Markdown, JSON, and HTML monitor report.")
     add_common_filters(report_parser)
     report_parser.add_argument("--markdown-path", default=str(DEFAULT_MARKDOWN_PATH))
     report_parser.add_argument("--json-path", default=str(DEFAULT_JSON_PATH))
@@ -234,10 +238,10 @@ def parse_args() -> argparse.Namespace:
     report_parser.add_argument("--recent-limit", type=int, default=10)
     report_parser.add_argument("--mode", choices=["basic", "hybrid", "inferred"], default=DEFAULT_REPORT_MODE)
 
-    serve_parser = subparsers.add_parser("serve", help="Generate browser dashboards and serve them on the local network.")
+    serve_parser = subparsers.add_parser("serve", help="Generate the browser dashboard and serve it locally.")
     add_common_filters(serve_parser)
     serve_parser.add_argument("--output-dir", default="tmp/codex_usage")
-    serve_parser.add_argument("--host", default="0.0.0.0")
+    serve_parser.add_argument("--host", default="127.0.0.1")
     serve_parser.add_argument("--port", type=int, default=DEFAULT_SERVE_PORT)
     serve_parser.add_argument("--recent-limit", type=int, default=12)
     serve_parser.add_argument(
@@ -279,7 +283,16 @@ def main() -> int:
     args = parse_args()
     timezone = ZoneInfo(args.timezone)
     ratings_path = Path(args.ratings_path)
-    sessions = load_filtered_sessions_for_args(args, timezone=timezone)
+    try:
+        sessions = load_filtered_sessions_for_args(args, timezone=timezone)
+    except FileNotFoundError as exc:
+        print(
+            f"{exc}\n\n"
+            "This tool reads local Codex history from `~/.codex` by default.\n"
+            "If your Codex data lives elsewhere, pass `--codex-home /path/to/.codex` before the subcommand.",
+            file=sys.stderr,
+        )
+        return 1
 
     if args.command == "list":
         handle_list(sessions, unrated_only=args.unrated)
@@ -1275,6 +1288,18 @@ def handle_serve(args: argparse.Namespace, *, sessions: list[SessionSummary], ti
             live_sessions = load_filtered_sessions_for_args(args, timezone=timezone)
             return rebuild_dashboard(live_sessions)
 
+    class LiveDashboardHandler(http.server.SimpleHTTPRequestHandler):
+        def do_GET(self) -> None:
+            request_path = self.path.split("?", 1)[0]
+            if request_path in {"/", "/index.html", "/latest-report.json", "/latest-report.md"}:
+                try:
+                    maybe_refresh_dashboard()
+                except Exception as exc:  # pragma: no cover - defensive logging
+                    print(f"Dashboard refresh failed: {exc}", file=sys.stderr, flush=True)
+            super().do_GET()
+
+    handler = partial(LiveDashboardHandler, directory=str(output_dir.resolve()))
+    server = http.server.ThreadingHTTPServer((args.host, args.port), handler)
     main_paths = rebuild_dashboard(sessions)
     urls = dashboard_urls(args.host, args.port, main_paths["html_path"].name)
     print(f"Serving dashboard from {output_dir.resolve()}", flush=True)
@@ -1288,19 +1313,6 @@ def handle_serve(args: argparse.Namespace, *, sessions: list[SessionSummary], ti
     else:
         print("Live refresh is disabled: the current served page stays static until you rerun `serve`.", flush=True)
     print("Press Ctrl+C to stop.", flush=True)
-
-    class LiveDashboardHandler(http.server.SimpleHTTPRequestHandler):
-        def do_GET(self) -> None:
-            request_path = self.path.split("?", 1)[0]
-            if request_path in {"/", "/index.html", "/latest-report.json", "/latest-report.md"}:
-                try:
-                    maybe_refresh_dashboard()
-                except Exception as exc:  # pragma: no cover - defensive logging
-                    print(f"Dashboard refresh failed: {exc}", file=sys.stderr, flush=True)
-            super().do_GET()
-
-    handler = partial(LiveDashboardHandler, directory=str(output_dir.resolve()))
-    server = http.server.ThreadingHTTPServer((args.host, args.port), handler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -1474,8 +1486,8 @@ def dashboard_urls(host: str, port: int, page_name: str) -> list[tuple[str, str]
         urls.append(("Local", f"http://127.0.0.1:{port}/{page_name}"))
         for ip in detect_local_ips():
             urls.append(("LAN", f"http://{ip}:{port}/{page_name}"))
-    elif host == "localhost":
-        urls.append(("Local", f"http://localhost:{port}/{page_name}"))
+    elif host in {"localhost", "127.0.0.1"}:
+        urls.append(("Local", f"http://{host}:{port}/{page_name}"))
     else:
         urls.append(("Dashboard", f"http://{host}:{port}/{page_name}"))
     deduped: list[tuple[str, str]] = []

@@ -9,7 +9,7 @@
   <array>
     <string>/bin/zsh</string>
     <string>-lc</string>
-    <string>cd '/path/to/your/repo' &amp;&amp; exec /usr/bin/env python3 scripts/codex_usage_monitor.py serve --days 21 --limit 20 --recent-limit 12 --refresh-seconds 60 --port 8769</string>
+    <string>cd '/path/to/your/repo' &amp;&amp; exec /usr/bin/env python3 scripts/codex_usage_monitor.py serve --host 127.0.0.1 --days 21 --limit 20 --recent-limit 12 --refresh-seconds 60 --port 8769</string>
   </array>
 
   <key>EnvironmentVariables</key>
