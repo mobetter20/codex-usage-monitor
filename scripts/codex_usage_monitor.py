@@ -109,16 +109,6 @@ def detect_default_timezone() -> str:
 
 DEFAULT_TIMEZONE = detect_default_timezone()
 
-
-@dataclass
-class RatingRecord:
-    session_id: str
-    score: int
-    outcome: str
-    notes: str
-    recorded_at: str
-
-
 @dataclass
 class SessionSummary:
     session_id: str
@@ -253,7 +243,6 @@ def load_filtered_sessions_for_args(args: argparse.Namespace, *, timezone: ZoneI
     sessions = load_sessions(
         codex_home=codex_home,
         timezone=timezone,
-        ratings={},
         workspace_root=workspace_root,
     )
     return filter_sessions(
@@ -289,43 +278,10 @@ def main() -> int:
         return handle_serve(args, sessions=sessions, timezone=timezone)
 
     raise ValueError(f"Unsupported command: {args.command}")
-
-
-def load_ratings(path: Path) -> dict[str, RatingRecord]:
-    ratings: dict[str, RatingRecord] = {}
-    if not path.exists():
-        return ratings
-
-    with path.open("r", encoding="utf-8") as handle:
-        for raw_line in handle:
-            line = raw_line.strip()
-            if not line:
-                continue
-            try:
-                payload = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            session_id = str(payload.get("session_id", "")).strip()
-            if not session_id:
-                continue
-            score = safe_int(payload.get("score"))
-            if score is None:
-                continue
-            ratings[session_id] = RatingRecord(
-                session_id=session_id,
-                score=score,
-                outcome=str(payload.get("outcome", "kept")).strip() or "kept",
-                notes=str(payload.get("notes", "")).strip(),
-                recorded_at=str(payload.get("recorded_at", "")),
-            )
-    return ratings
-
-
 def load_sessions(
     *,
     codex_home: Path,
     timezone: ZoneInfo,
-    ratings: dict[str, RatingRecord],
     workspace_root: Path,
 ) -> list[SessionSummary]:
     database_path = codex_home / "state_5.sqlite"
@@ -378,7 +334,6 @@ def load_sessions(
 
         substantive_messages = rollout_metrics["user_messages"]
         initial_prompt = substantive_messages[0] if substantive_messages else fallback_prompt
-        manual = ratings.get(row["id"])
         total_tokens = rollout_metrics["total_tokens"] or normalize_thread_tokens(row["tokens_used"])
         final_answer = rollout_metrics["final_answer"]
         project_info = infer_project_summary(
@@ -434,9 +389,9 @@ def load_sessions(
                 write_actions=rollout_metrics["write_actions"],
                 error_signal=has_error_signal(final_answer),
             ),
-            manual_rating=manual.score if manual else None,
-            manual_outcome=manual.outcome if manual else "",
-            manual_notes=manual.notes if manual else "",
+            manual_rating=None,
+            manual_outcome="",
+            manual_notes="",
         )
         sessions.append(session)
 
@@ -1095,109 +1050,6 @@ def handle_list(sessions: list[SessionSummary]) -> None:
         )
 
 
-def handle_rate(
-    args: argparse.Namespace,
-    *,
-    sessions: list[SessionSummary],
-    ratings_path: Path,
-    timezone: ZoneInfo,
-) -> int:
-    if args.session and args.score is not None:
-        target = find_session_by_id(args.session, sessions)
-        if target is None:
-            print(f"Session not found in current filter window: {args.session}", file=sys.stderr)
-            return 1
-        return save_rating(
-            ratings_path=ratings_path,
-            session=target,
-            score=args.score,
-            outcome=args.outcome,
-            notes=args.notes,
-            timezone=timezone,
-        )
-
-    candidates = [session for session in sessions if session.manual_rating is None][: args.latest]
-    if not candidates:
-        print("No unrated sessions available in the current filter window.")
-        return 0
-
-    handle_list(candidates, unrated_only=False)
-    selection = input("Choose a session by index or full id: ").strip()
-    target = pick_session(selection, candidates)
-    if target is None:
-        print("Could not match that session.", file=sys.stderr)
-        return 1
-
-    score_text = input("Score 1-5 (1 unusable, 5 strong): ").strip()
-    score = safe_int(score_text)
-    if score is None:
-        print("Score must be a number from 1 to 5.", file=sys.stderr)
-        return 1
-
-    outcome = input("Outcome label [kept/minor-edit/heavy-edit/discard] (default kept): ").strip() or "kept"
-    notes = input("Optional note: ").strip()
-    return save_rating(
-        ratings_path=ratings_path,
-        session=target,
-        score=score,
-        outcome=outcome,
-        notes=notes,
-        timezone=timezone,
-    )
-
-
-def pick_session(selection: str, sessions: list[SessionSummary]) -> SessionSummary | None:
-    if not selection:
-        return None
-    index = safe_int(selection)
-    if index is not None and 1 <= index <= len(sessions):
-        return sessions[index - 1]
-    return find_session_by_id(selection, sessions)
-
-
-def find_session_by_id(selection: str, sessions: list[SessionSummary]) -> SessionSummary | None:
-    normalized = selection.strip()
-    if not normalized:
-        return None
-
-    exact_matches = [session for session in sessions if session.session_id == normalized]
-    if exact_matches:
-        return exact_matches[0]
-
-    prefix_matches = [session for session in sessions if session.session_id.startswith(normalized)]
-    if len(prefix_matches) == 1:
-        return prefix_matches[0]
-    return None
-
-
-def save_rating(
-    *,
-    ratings_path: Path,
-    session: SessionSummary,
-    score: int,
-    outcome: str,
-    notes: str,
-    timezone: ZoneInfo,
-) -> int:
-    if score < 1 or score > 5:
-        print("Score must be between 1 and 5.", file=sys.stderr)
-        return 1
-
-    ratings_path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "session_id": session.session_id,
-        "score": score,
-        "outcome": outcome.strip() or "kept",
-        "notes": notes.strip(),
-        "recorded_at": datetime.now(timezone).isoformat(timespec="seconds"),
-    }
-    with ratings_path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-
-    print(f"Saved rating {score}/5 for {session.session_id} ({trim_snippet(session.title, 60)}).")
-    return 0
-
-
 def handle_report(args: argparse.Namespace, *, sessions: list[SessionSummary], timezone: ZoneInfo) -> int:
     summary = build_report_payload(sessions, report_mode="basic")
     paths = write_report_bundle(
@@ -1291,9 +1143,20 @@ def handle_serve(args: argparse.Namespace, *, sessions: list[SessionSummary], ti
 
 
 def build_json_payload(summary: dict[str, Any], timezone: ZoneInfo) -> dict[str, Any]:
+    summary_payload = dict(summary["summary"])
+    for key in ("report_mode", "rated_count", "proxy_only_count", "manual_rating_average"):
+        summary_payload.pop(key, None)
+
+    sessions_payload = []
+    for session in summary["sessions"]:
+        payload = session.export_dict()
+        for key in ("manual_rating", "manual_outcome", "manual_notes", "quality_source"):
+            payload.pop(key, None)
+        sessions_payload.append(payload)
+
     return {
         "generated_at": datetime.now(timezone).isoformat(timespec="seconds"),
-        "summary": summary["summary"],
+        "summary": summary_payload,
         "measurement_confidence": summary["measurement_confidence"],
         "label_guide": summary["label_guide"],
         "usage_reference": summary["usage_reference"],
@@ -1302,11 +1165,10 @@ def build_json_payload(summary: dict[str, Any], timezone: ZoneInfo) -> dict[str,
         "findings": summary["findings"],
         "recommendations": summary["recommendations"],
         "next_steps": summary["next_steps"],
-        "factor_breakdowns": summary["factor_breakdowns"],
         "project_usage_rows": summary["project_usage_rows"],
         "daily_usage_rows": summary["daily_usage_rows"],
         "heavy_session_rows": summary["heavy_session_rows"],
-        "sessions": [session.export_dict() for session in summary["sessions"]],
+        "sessions": sessions_payload,
     }
 
 
@@ -2505,19 +2367,6 @@ def render_html_report(
         margin-top: 10px;
       }}
 
-      .factor-grid {{
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 14px;
-      }}
-
-      .factor-card {{
-        border: 1px solid var(--line);
-        border-radius: 20px;
-        padding: 18px;
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(250, 243, 236, 0.86));
-      }}
-
       table {{
         width: 100%;
         border-collapse: collapse;
@@ -2646,8 +2495,7 @@ def render_html_report(
 
       @media (max-width: 980px) {{
         .layout,
-        .hero-grid,
-        .factor-grid {{
+        .hero-grid {{
           grid-template-columns: 1fr;
         }}
       }}
@@ -2868,32 +2716,6 @@ def render_html_report(
     </script>
   </body>
 </html>"""
-
-
-def render_factor_section(section_name: str, rows: list[dict[str, Any]]) -> str:
-    table_rows = "".join(
-        (
-            "<tr>"
-            f"<td>{html.escape(str(row['label']))}</td>"
-            f"<td>{row['sessions']}</td>"
-            f"<td>{format_number(row['average_tokens'])}</td>"
-            f"<td>{row['average_minutes']}</td>"
-            "</tr>"
-        )
-        for row in rows
-    )
-    return (
-        "<article class='factor-card'>"
-        f"<div class='section-title'><h3>{html.escape(section_name.replace('_', ' ').title())}</h3>"
-        f"<div class='section-kicker'>{len(rows)} groups</div></div>"
-        "<table>"
-        "<thead><tr><th>Label</th><th>Sessions</th><th>Avg tokens</th><th>Avg mins</th></tr></thead>"
-        f"<tbody>{table_rows}</tbody>"
-        "</table>"
-        "</article>"
-    )
-
-
 def render_usage_table(headers: list[str], rows: list[list[str]]) -> str:
     header_html = "".join(f"<th>{html.escape(header)}</th>" for header in headers)
     row_html = "".join(
@@ -2904,8 +2726,6 @@ def render_usage_table(headers: list[str], rows: list[list[str]]) -> str:
 
 
 def render_session_row(session: SessionSummary) -> str:
-    notes = session.manual_notes or ""
-    outcome = session.manual_outcome or ""
     badges = [
         f"<span class='pill proxy'>{html.escape(project_label(session))}</span>",
         f"<span class='pill proxy'>{html.escape(display_task_bucket(session.task_bucket))}</span>",
@@ -2924,13 +2744,19 @@ def render_session_row(session: SessionSummary) -> str:
             session.project_confidence,
             display_task_bucket(session.task_bucket),
             session.reasoning_effort,
-            notes,
-            outcome,
         ]
     ).lower()
 
-    note_html = f"<div class='session-meta'>{html.escape(trim_snippet(notes, 120))}</div>" if notes else ""
-    outcome_html = f"<div class='session-meta'>{html.escape(outcome)}</div>" if outcome else ""
+    pressure_parts: list[str] = []
+    if session.primary_used_percent_max is not None:
+        pressure_parts.append(f"primary {session.primary_used_percent_max:.1f}%")
+    if session.secondary_used_percent_max is not None:
+        pressure_parts.append(f"secondary {session.secondary_used_percent_max:.1f}%")
+    pressure_html = (
+        f"<div class='session-meta'>{html.escape(', '.join(pressure_parts))}</div>"
+        if pressure_parts
+        else ""
+    )
 
     return (
         f"<tr data-agent=\"{'yes' if session.agent_used else 'no'}\" "
@@ -2942,50 +2768,18 @@ def render_session_row(session: SessionSummary) -> str:
         f"<div class='session-meta'>{html.escape(short_session_id(session.session_id))} | "
         f"{session.updated_at:%Y-%m-%d %H:%M} | {html.escape(session.model)}</div>"
         f"<div class='session-meta'>{html.escape(project_hint(session.inferred_project))}</div>"
-        f"{note_html}"
         "</td>"
         "<td>"
         f"<div class='badge-row'>{''.join(badges)}</div>"
-        f"{outcome_html}"
+        f"<div class='session-meta'>scope confidence: {html.escape(session.project_confidence)}</div>"
         "</td>"
         "<td>"
         f"<div class='session-title'>{html.escape(format_tokens(session.total_tokens))}</div>"
         f"<div class='session-meta'>{session.duration_minutes:.1f} mins</div>"
+        f"{pressure_html}"
         "</td>"
         "</tr>"
     )
-
-
-def rating_guide() -> list[dict[str, str]]:
-    return [
-        {
-            "score": "1",
-            "label": "Miss",
-            "description": "Wrong direction or not usable. You would not want the same setup again.",
-        },
-        {
-            "score": "2",
-            "label": "Weak",
-            "description": "Partly useful, but heavy rewriting, correction, or rework was needed.",
-        },
-        {
-            "score": "3",
-            "label": "Mixed",
-            "description": "Usable enough, but not efficient. You are unsure the cost was worth it.",
-        },
-        {
-            "score": "4",
-            "label": "Good",
-            "description": "Solid result with minor cleanup. You would probably use the same setup again.",
-        },
-        {
-            "score": "5",
-            "label": "Strong",
-            "description": "Very good result. Fast enough, clear enough, and worth repeating on similar tasks.",
-        },
-    ]
-
-
 def inline_markdown(text: str) -> str:
     escaped = html.escape(text)
     parts = escaped.split("`")
@@ -3018,12 +2812,6 @@ def format_tokens(value: int | None) -> str:
     if value >= 1_000:
         return f"{value / 1_000:.0f}k"
     return str(value)
-
-
-def format_quality(session: SessionSummary) -> str:
-    if session.manual_rating is not None:
-        return f"{session.manual_rating}/5 manual"
-    return f"{session.proxy_quality:.1f} proxy"
 
 
 def flag(enabled: bool) -> str:
