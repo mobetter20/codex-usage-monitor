@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.example.codex-usage-monitor</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>cd '/path/to/your/repo' &amp;&amp; exec /usr/bin/env python3 scripts/codex_usage_monitor.py serve --days 21 --limit 20 --recent-limit 12 --refresh-seconds 60 --port 8769</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>CODEX_USAGE_MONITOR_PORT</key>
+    <string>8769</string>
+    <key>CODEX_USAGE_MONITOR_REFRESH_SECONDS</key>
+    <string>60</string>
+    <key>CODEX_USAGE_MONITOR_DAYS</key>
+    <string>21</string>
+    <key>CODEX_USAGE_MONITOR_LIMIT</key>
+    <string>20</string>
+    <key>CODEX_USAGE_MONITOR_RECENT_LIMIT</key>
+    <string>12</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>ProcessType</key>
+  <string>Background</string>
+
+  <key>StandardOutPath</key>
+  <string>/path/to/your/repo/tmp/codex_usage/launchd.stdout.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/path/to/your/repo/tmp/codex_usage/launchd.stderr.log</string>
+</dict>
+</plist>
