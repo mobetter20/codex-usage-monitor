@@ -26,11 +26,9 @@ from zoneinfo import ZoneInfo
 
 
 DEFAULT_CODEX_HOME = Path.home() / ".codex"
-DEFAULT_RATINGS_PATH = Path("tmp/codex_usage/ratings.jsonl")
 DEFAULT_MARKDOWN_PATH = Path("tmp/codex_usage/latest-report.md")
 DEFAULT_JSON_PATH = Path("tmp/codex_usage/latest-report.json")
 DEFAULT_HTML_PATH = Path("tmp/codex_usage/dashboard.html")
-DEFAULT_REPORT_MODE = "hybrid"
 
 ERROR_TERMS = (
     "failed",
@@ -208,7 +206,6 @@ def parse_args() -> argparse.Namespace:
         description="Monitor local Codex usage patterns and output signals."
     )
     parser.add_argument("--codex-home", default=str(DEFAULT_CODEX_HOME))
-    parser.add_argument("--ratings-path", default=str(DEFAULT_RATINGS_PATH))
     parser.add_argument("--timezone", default=DEFAULT_TIMEZONE)
     parser.add_argument(
         "--workspace-root",
@@ -220,15 +217,6 @@ def parse_args() -> argparse.Namespace:
 
     list_parser = subparsers.add_parser("list", help="List recent completed sessions.")
     add_common_filters(list_parser)
-    list_parser.add_argument("--unrated", action="store_true")
-
-    rate_parser = subparsers.add_parser("rate", help="Attach a manual quality score to a session.")
-    add_common_filters(rate_parser)
-    rate_parser.add_argument("--session")
-    rate_parser.add_argument("--score", type=int)
-    rate_parser.add_argument("--outcome", default="kept")
-    rate_parser.add_argument("--notes", default="")
-    rate_parser.add_argument("--latest", type=int, default=8)
 
     report_parser = subparsers.add_parser("report", help="Build a Markdown, JSON, and HTML monitor report.")
     add_common_filters(report_parser)
@@ -236,7 +224,6 @@ def parse_args() -> argparse.Namespace:
     report_parser.add_argument("--json-path", default=str(DEFAULT_JSON_PATH))
     report_parser.add_argument("--html-path", default=str(DEFAULT_HTML_PATH))
     report_parser.add_argument("--recent-limit", type=int, default=10)
-    report_parser.add_argument("--mode", choices=["basic", "hybrid", "inferred"], default=DEFAULT_REPORT_MODE)
 
     serve_parser = subparsers.add_parser("serve", help="Generate the browser dashboard and serve it locally.")
     add_common_filters(serve_parser)
@@ -262,13 +249,11 @@ def add_common_filters(parser: argparse.ArgumentParser) -> None:
 
 def load_filtered_sessions_for_args(args: argparse.Namespace, *, timezone: ZoneInfo) -> list[SessionSummary]:
     codex_home = Path(args.codex_home).expanduser()
-    ratings_path = Path(args.ratings_path)
     workspace_root = Path(args.workspace_root).expanduser().resolve()
-    ratings = load_ratings(ratings_path)
     sessions = load_sessions(
         codex_home=codex_home,
         timezone=timezone,
-        ratings=ratings,
+        ratings={},
         workspace_root=workspace_root,
     )
     return filter_sessions(
@@ -282,7 +267,6 @@ def load_filtered_sessions_for_args(args: argparse.Namespace, *, timezone: ZoneI
 def main() -> int:
     args = parse_args()
     timezone = ZoneInfo(args.timezone)
-    ratings_path = Path(args.ratings_path)
     try:
         sessions = load_filtered_sessions_for_args(args, timezone=timezone)
     except FileNotFoundError as exc:
@@ -295,11 +279,8 @@ def main() -> int:
         return 1
 
     if args.command == "list":
-        handle_list(sessions, unrated_only=args.unrated)
+        handle_list(sessions)
         return 0
-
-    if args.command == "rate":
-        return handle_rate(args, sessions=sessions, ratings_path=ratings_path, timezone=timezone)
 
     if args.command == "report":
         return handle_report(args, sessions=sessions, timezone=timezone)
@@ -1010,11 +991,10 @@ def recommendation_confidence(sessions: list[SessionSummary]) -> str:
 
 
 def report_mode_description(report_mode: str) -> str:
-    if report_mode == "basic":
-        return "`basic` mode stays descriptive only: it shows usage patterns by project and setting without making ROI guesses."
-    if report_mode == "inferred":
-        return "`inferred` mode will make project-scoped ROI guesses from rollout evidence, even when confidence is mostly proxy-based."
-    return "`hybrid` mode stays factual by default and only makes ROI suggestions where sessions look comparable within one inferred project."
+    return (
+        "This monitor is strongest on measured telemetry such as tokens, timestamps, pressure peaks, "
+        "reasoning level, planning, and subagent usage."
+    )
 
 
 def infer_task_bucket(title: str, prompt: str) -> str:
@@ -1092,16 +1072,15 @@ def filter_sessions(
     return filtered[:limit]
 
 
-def handle_list(sessions: list[SessionSummary], *, unrated_only: bool) -> None:
-    visible = [session for session in sessions if not unrated_only or session.manual_rating is None]
-    if not visible:
+def handle_list(sessions: list[SessionSummary]) -> None:
+    if not sessions:
         print("No matching sessions found.")
         return
 
     print(
-        "idx  date              id        project              bucket      effort  ag  pl  tokens    quality        title"
+        "idx  date              id        project              bucket      effort  ag  pl  tokens    title"
     )
-    for index, session in enumerate(visible, start=1):
+    for index, session in enumerate(sessions, start=1):
         print(
             f"{index:>3}  "
             f"{session.updated_at:%Y-%m-%d %H:%M}  "
@@ -1112,7 +1091,6 @@ def handle_list(sessions: list[SessionSummary], *, unrated_only: bool) -> None:
             f"{flag(session.agent_used)}   "
             f"{flag(session.planning_used)}   "
             f"{format_tokens(session.total_tokens):>8}  "
-            f"{format_quality(session):<13}  "
             f"{trim_snippet(session.title, 52)}"
         )
 
@@ -1221,15 +1199,14 @@ def save_rating(
 
 
 def handle_report(args: argparse.Namespace, *, sessions: list[SessionSummary], timezone: ZoneInfo) -> int:
-    summary = build_report_payload(sessions, report_mode=args.mode)
+    summary = build_report_payload(sessions, report_mode="basic")
     paths = write_report_bundle(
         summary,
         timezone=timezone,
         recent_limit=args.recent_limit,
-        markdown_path=resolve_report_output_path(Path(args.markdown_path), DEFAULT_MARKDOWN_PATH, args.mode),
-        json_path=resolve_report_output_path(Path(args.json_path), DEFAULT_JSON_PATH, args.mode),
-        html_path=resolve_report_output_path(Path(args.html_path), DEFAULT_HTML_PATH, args.mode),
-        write_index=False,
+        markdown_path=Path(args.markdown_path),
+        json_path=Path(args.json_path),
+        html_path=Path(args.html_path),
     )
     print(render_markdown_report(summary, recent_limit=args.recent_limit, timezone=timezone))
     print()
@@ -1237,14 +1214,6 @@ def handle_report(args: argparse.Namespace, *, sessions: list[SessionSummary], t
     print(f"Saved JSON report to {paths['json_path']}")
     print(f"Saved HTML dashboard to {paths['html_path']}")
     return 0
-
-
-def resolve_report_output_path(path: Path, default_path: Path, report_mode: str) -> Path:
-    if path != default_path:
-        return path
-    if report_mode == DEFAULT_REPORT_MODE:
-        return path
-    return path.with_name(f"{path.stem}-{report_mode}{path.suffix}")
 
 
 def handle_serve(args: argparse.Namespace, *, sessions: list[SessionSummary], timezone: ZoneInfo) -> int:
@@ -1257,7 +1226,7 @@ def handle_serve(args: argparse.Namespace, *, sessions: list[SessionSummary], ti
     }
 
     def rebuild_dashboard(live_sessions: list[SessionSummary]) -> dict[str, Path]:
-        summary = build_report_payload(live_sessions, report_mode="hybrid")
+        summary = build_report_payload(live_sessions, report_mode="basic")
         paths = write_report_bundle(
             summary,
             timezone=timezone,
@@ -1265,7 +1234,6 @@ def handle_serve(args: argparse.Namespace, *, sessions: list[SessionSummary], ti
             markdown_path=output_dir / "latest-report.md",
             json_path=output_dir / "latest-report.json",
             html_path=output_dir / "index.html",
-            write_index=False,
         )
         state["last_refresh_monotonic"] = time.monotonic()
         state["last_refresh_at"] = datetime.now(timezone).isoformat(timespec="seconds")
@@ -1338,7 +1306,6 @@ def build_json_payload(summary: dict[str, Any], timezone: ZoneInfo) -> dict[str,
         "project_usage_rows": summary["project_usage_rows"],
         "daily_usage_rows": summary["daily_usage_rows"],
         "heavy_session_rows": summary["heavy_session_rows"],
-        "rating_guide": rating_guide(),
         "sessions": [session.export_dict() for session in summary["sessions"]],
     }
 
@@ -1351,7 +1318,6 @@ def write_report_bundle(
     markdown_path: Path,
     json_path: Path,
     html_path: Path,
-    write_index: bool,
 ) -> dict[str, Path]:
     markdown = render_markdown_report(summary, recent_limit=recent_limit, timezone=timezone)
     html_text = render_html_report(summary, recent_limit=recent_limit, timezone=timezone)
@@ -1362,122 +1328,11 @@ def write_report_bundle(
     markdown_path.write_text(markdown + "\n", encoding="utf-8")
     json_path.write_text(json.dumps(json_payload, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
     html_path.write_text(html_text + "\n", encoding="utf-8")
-    if write_index:
-        write_dashboard_index(
-            html_path.parent,
-            basic_html_path=html_path.parent / "dashboard-basic.html",
-            hybrid_html_path=html_path.parent / "dashboard.html",
-            generated_at=datetime.now(timezone).isoformat(timespec="seconds"),
-        )
     return {
         "markdown_path": markdown_path,
         "json_path": json_path,
         "html_path": html_path,
     }
-
-
-def write_dashboard_index(
-    output_dir: Path,
-    *,
-    basic_html_path: Path,
-    hybrid_html_path: Path,
-    generated_at: str,
-) -> Path:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    index_path = output_dir / "index.html"
-    basic_name = basic_html_path.name
-    hybrid_name = hybrid_html_path.name
-    index_html = f"""<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Codex Usage Dashboards</title>
-    <style>
-      body {{
-        margin: 0;
-        font-family: "Avenir Next", "Gill Sans", "Trebuchet MS", sans-serif;
-        background: linear-gradient(180deg, #f6f1e7, #efe4d2);
-        color: #1f1c1a;
-      }}
-      .page {{
-        width: min(860px, calc(100vw - 32px));
-        margin: 36px auto;
-      }}
-      .hero {{
-        border-radius: 28px;
-        padding: 28px;
-        background: rgba(255, 250, 244, 0.92);
-        box-shadow: 0 18px 60px rgba(66, 41, 25, 0.12);
-      }}
-      h1, h2 {{
-        font-family: "Iowan Old Style", Georgia, serif;
-        margin: 0;
-      }}
-      p {{
-        color: #6b6257;
-        line-height: 1.55;
-      }}
-      .cards {{
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 16px;
-        margin-top: 20px;
-      }}
-      .card {{
-        border-radius: 22px;
-        padding: 22px;
-        border: 1px solid rgba(73, 57, 41, 0.14);
-        background: rgba(255, 251, 245, 0.92);
-      }}
-      .cta {{
-        display: inline-block;
-        margin-top: 14px;
-        padding: 11px 16px;
-        border-radius: 999px;
-        background: rgba(181, 82, 51, 0.12);
-        color: #b55233;
-        text-decoration: none;
-        font-weight: 700;
-      }}
-      code {{
-        display: inline-block;
-        margin-top: 8px;
-        padding: 8px 10px;
-        border-radius: 12px;
-        background: rgba(29, 25, 22, 0.96);
-        color: #f7f1e7;
-      }}
-      @media (max-width: 760px) {{
-        .cards {{
-          grid-template-columns: 1fr;
-        }}
-      }}
-    </style>
-  </head>
-  <body>
-    <div class="page">
-      <section class="hero">
-        <h1>Codex Usage Dashboards</h1>
-        <p>Generated {html.escape(generated_at)}. Basic is the clearest factual view. Hybrid keeps the same telemetry but adds cautious interpretation when evidence is strong enough.</p>
-        <div class="cards">
-          <article class="card">
-            <h2>Basic Dashboard</h2>
-            <p>Best default. Shows measured tokens, project mix, daily burn, pressure, and heaviest sessions without leaning on weak advice.</p>
-            <a class="cta" href="{html.escape(basic_name)}">Open Basic</a>
-          </article>
-          <article class="card">
-            <h2>Hybrid Dashboard</h2>
-            <p>Same telemetry, plus tentative project-aware interpretation. Use when you want context, not certainty.</p>
-            <a class="cta" href="{html.escape(hybrid_name)}">Open Hybrid</a>
-          </article>
-        </div>
-      </section>
-    </div>
-  </body>
-</html>"""
-    index_path.write_text(index_html + "\n", encoding="utf-8")
-    return index_path
 
 
 def dashboard_urls(host: str, port: int, page_name: str) -> list[tuple[str, str]]:
@@ -1643,13 +1498,8 @@ def build_measurement_confidence(
         "Measured directly: session ids, timestamps, model, reasoning effort, token counts, rate-limit peaks, and whether planning (`update_plan`), subagents (`spawn_agent`), and file edits (`apply_patch`) were used.",
         "Estimated: duration is thread lifespan from `created_at` to `updated_at`, not active keyboard time.",
         f"Inferred: project attribution is heuristic. This window has {summary['high_confidence_project_sessions']} high-confidence, {summary['medium_confidence_project_sessions']} medium-confidence, and {summary['low_confidence_project_sessions']} low-confidence project labels.",
+        "Advisory sections are heuristic. They infer likely outcome quality from session signals rather than ground-truth labels.",
     ]
-    if summary["rated_count"] == 0:
-        lines.append("Quality is currently proxy-only, so any advice about ROI or habit value should be treated as tentative.")
-    else:
-        lines.append(
-            f"Quality has {summary['rated_count']} manual anchor ratings and {summary['proxy_only_count']} proxy-only sessions in this window."
-        )
     if not sessions:
         lines.append("No completed sessions are available in this filter window.")
     return lines
@@ -1880,17 +1730,8 @@ def build_findings(
         return ["No completed sessions were found in the current window."]
 
     findings.append(report_mode_description(report_mode))
-
-    if summary["rated_count"] == 0:
-        findings.append(
-            f"Quality is proxy-only right now: 0 of {summary['session_count']} completed sessions have a manual rating."
-        )
-    else:
-        findings.append(
-            f"You have {summary['rated_count']} manually rated sessions and {summary['proxy_only_count']} proxy-only sessions in the current window."
-        )
     findings.append(
-        "Proxy quality is inferred from completion signals, output shape, write actions, verification commands, and obvious failure language."
+        "Project grouping and task-bucket attribution are inferred heuristically, so mixed or conceptual sessions should be read more cautiously."
     )
 
     findings.append(
@@ -1964,12 +1805,10 @@ def build_recommendations(
     reasoning_comparable = count_comparable_reasoning_samples(sessions, report_mode=report_mode)
 
     if report_mode == "basic":
-        recommendations.append(
-            "Use `--mode basic` when you want a clean factual dashboard only. Switch to `--mode hybrid` for project-scoped habit suggestions."
-        )
+        recommendations.append("Read the usage sections first and treat the advisory read as secondary, especially when project attribution is mostly low-confidence.")
         if summary["project_scoped_sessions"] < 6:
             recommendations.append(
-                "Most recent sessions are still too mixed or shared to support fair within-project ROI comparisons; basic mode is the safer read for now."
+                "Most recent sessions are still too mixed or shared to support fair within-project ROI comparisons."
             )
         return dedupe_lines(recommendations)
 
@@ -2362,19 +2201,6 @@ def render_markdown_report(
     else:
         lines.append("- No high-confidence habit changes surfaced in this window.")
     lines.append("")
-    lines.append("## Factor Breakdown")
-    for section_name, rows in payload["factor_breakdowns"].items():
-        lines.append(f"### {section_name.replace('_', ' ').title()}")
-        lines.append("")
-        lines.append("| label | sessions | manual | avg quality | avg tokens | avg mins | quality / 100k |")
-        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: |")
-        for row in rows:
-            lines.append(
-                f"| {row['label']} | {row['sessions']} | {row['manual_ratings']} | "
-                f"{row['average_quality']} | {int(row['average_tokens']):,} | "
-                f"{row['average_minutes']} | {row['quality_per_100k_tokens']} |"
-            )
-    lines.append("")
     lines.append("## Burn Summary")
     for item in payload["burn_summary"]:
         lines.append(f"- {item}")
@@ -2391,14 +2217,13 @@ def render_markdown_report(
     lines.append("")
     lines.append("## Recent Sessions")
     lines.append("")
-    lines.append("| when | id | project | bucket | effort | ag | pl | tokens | quality | title |")
-    lines.append("| --- | --- | --- | --- | --- | ---: | ---: | ---: | --- | --- |")
+    lines.append("| when | id | project | bucket | effort | ag | pl | tokens | title |")
+    lines.append("| --- | --- | --- | --- | --- | ---: | ---: | ---: | --- |")
     for session in sessions[:recent_limit]:
         lines.append(
             f"| {session.updated_at:%Y-%m-%d %H:%M} | {short_session_id(session.session_id)} | {project_label(session)} | {display_task_bucket(session.task_bucket)} | "
             f"{session.reasoning_effort} | {yes_no(session.agent_used)} | {yes_no(session.planning_used)} | "
-            f"{format_tokens(session.total_tokens)} | {format_quality(session)} | "
-            f"{trim_snippet(session.title, 48)} |"
+            f"{format_tokens(session.total_tokens)} | {trim_snippet(session.title, 48)} |"
         )
     lines.append("")
     lines.append("## Next Steps")
@@ -2426,10 +2251,6 @@ def render_html_report(
         f"<li>{inline_markdown(item)}</li>" for item in (payload["recommendations"] or ["No strong recommendation yet."])
     )
     next_steps = "".join(f"<li>{inline_markdown(item)}</li>" for item in payload["next_steps"])
-    factor_sections = "".join(
-        render_factor_section(section_name, rows)
-        for section_name, rows in payload["factor_breakdowns"].items()
-    )
     project_usage_table = render_usage_table(
         headers=["Project", "Sessions", "Tokens", "Share", "Primary", "Secondary", "Confidence"],
         rows=[
@@ -2918,16 +2739,6 @@ def render_html_report(
 
           <section class="panel">
             <div class="section-title">
-              <h2>Factor breakdown</h2>
-              <div class="section-kicker">Quality vs cost by habit</div>
-            </div>
-            <div class="factor-grid">
-              {factor_sections}
-            </div>
-          </section>
-
-          <section class="panel">
-            <div class="section-title">
               <h2>Burn summary</h2>
               <div class="section-kicker">Simple burn-rate read</div>
             </div>
@@ -2954,14 +2765,13 @@ def render_html_report(
               <button class="filter-chip" data-filter="xhigh">Xhigh</button>
               <button class="filter-chip" data-filter="medium">Medium</button>
             </div>
-            <input class="search" id="session-search" placeholder="Search title, project, note, task bucket, or session id" />
+            <input class="search" id="session-search" placeholder="Search title, project, task bucket, or session id" />
             <table class="session-table">
               <thead>
                 <tr>
                   <th>Session</th>
                   <th>Setup</th>
                   <th>Cost</th>
-                  <th>Quality signal</th>
                 </tr>
               </thead>
               <tbody id="session-rows">
@@ -3066,10 +2876,8 @@ def render_factor_section(section_name: str, rows: list[dict[str, Any]]) -> str:
             "<tr>"
             f"<td>{html.escape(str(row['label']))}</td>"
             f"<td>{row['sessions']}</td>"
-            f"<td>{row['manual_ratings']}</td>"
-            f"<td>{row['average_quality']}</td>"
             f"<td>{format_number(row['average_tokens'])}</td>"
-            f"<td>{row['quality_per_100k_tokens']}</td>"
+            f"<td>{row['average_minutes']}</td>"
             "</tr>"
         )
         for row in rows
@@ -3079,7 +2887,7 @@ def render_factor_section(section_name: str, rows: list[dict[str, Any]]) -> str:
         f"<div class='section-title'><h3>{html.escape(section_name.replace('_', ' ').title())}</h3>"
         f"<div class='section-kicker'>{len(rows)} groups</div></div>"
         "<table>"
-        "<thead><tr><th>Label</th><th>Sessions</th><th>Manual</th><th>Avg quality</th><th>Avg tokens</th><th>Q / 100k</th></tr></thead>"
+        "<thead><tr><th>Label</th><th>Sessions</th><th>Avg tokens</th><th>Avg mins</th></tr></thead>"
         f"<tbody>{table_rows}</tbody>"
         "</table>"
         "</article>"
@@ -3098,11 +2906,6 @@ def render_usage_table(headers: list[str], rows: list[list[str]]) -> str:
 def render_session_row(session: SessionSummary) -> str:
     notes = session.manual_notes or ""
     outcome = session.manual_outcome or ""
-    quality_pill = (
-        f"<span class='pill {'manual' if session.manual_rating is not None else 'proxy'}'>"
-        f"{html.escape(format_quality(session))}"
-        "</span>"
-    )
     badges = [
         f"<span class='pill proxy'>{html.escape(project_label(session))}</span>",
         f"<span class='pill proxy'>{html.escape(display_task_bucket(session.task_bucket))}</span>",
@@ -3149,7 +2952,6 @@ def render_session_row(session: SessionSummary) -> str:
         f"<div class='session-title'>{html.escape(format_tokens(session.total_tokens))}</div>"
         f"<div class='session-meta'>{session.duration_minutes:.1f} mins</div>"
         "</td>"
-        f"<td>{quality_pill}<div class='session-meta'>{html.escape(session.quality_source)}</div></td>"
         "</tr>"
     )
 
