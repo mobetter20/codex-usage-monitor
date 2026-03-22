@@ -109,4 +109,3 @@ The template is intentionally localhost-only.
 - Python standard library only. No extra dependencies.
 - The dashboard uses your real local Codex data, so generated output should be treated as personal workspace data.
 - The preview image in this README is sanitized and does not contain real session data.
-- The repo does not yet include a license file. Decide that before broad public reuse is encouraged.
