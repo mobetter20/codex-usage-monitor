@@ -1,0 +1,86 @@
+<svg width="1280" height="860" viewBox="0 0 1280 860" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1280" height="860" fill="#F6F1E7"/>
+  <rect x="28" y="24" width="1224" height="812" rx="32" fill="#F8F3EA"/>
+  <rect x="56" y="48" width="1168" height="172" rx="28" fill="#FFF8EF" stroke="#D8C8B6"/>
+  <rect x="84" y="76" width="188" height="34" rx="17" fill="#E4F0EC"/>
+  <text x="104" y="98" fill="#2B6B6D" font-family="Arial, sans-serif" font-size="16" font-weight="700">Codex Usage Monitor</text>
+  <text x="84" y="148" fill="#1F1C1A" font-family="Georgia, serif" font-size="40" font-weight="700">Usage patterns, made visible.</text>
+  <text x="84" y="184" fill="#6B6257" font-family="Arial, sans-serif" font-size="18">Sanitized preview. Real dashboard sections stay usage-first.</text>
+
+  <g>
+    <rect x="84" y="242" width="260" height="112" rx="22" fill="#FFFDF9" stroke="#E0D3C4"/>
+    <text x="108" y="278" fill="#6B6257" font-family="Arial, sans-serif" font-size="14" font-weight="700">SESSIONS ANALYZED</text>
+    <text x="108" y="322" fill="#1F1C1A" font-family="Arial, sans-serif" font-size="38" font-weight="700">48</text>
+    <text x="108" y="344" fill="#6B6257" font-family="Arial, sans-serif" font-size="15">Recent completed sessions</text>
+  </g>
+  <g>
+    <rect x="366" y="242" width="260" height="112" rx="22" fill="#FFFDF9" stroke="#E0D3C4"/>
+    <text x="390" y="278" fill="#6B6257" font-family="Arial, sans-serif" font-size="14" font-weight="700">MEASURED TOKENS</text>
+    <text x="390" y="322" fill="#1F1C1A" font-family="Arial, sans-serif" font-size="38" font-weight="700">84.2M</text>
+    <text x="390" y="344" fill="#6B6257" font-family="Arial, sans-serif" font-size="15">Subagents 21, planning 19</text>
+  </g>
+  <g>
+    <rect x="648" y="242" width="260" height="112" rx="22" fill="#FFFDF9" stroke="#E0D3C4"/>
+    <text x="672" y="278" fill="#6B6257" font-family="Arial, sans-serif" font-size="14" font-weight="700">USAGE PRESSURE</text>
+    <text x="672" y="322" fill="#1F1C1A" font-family="Arial, sans-serif" font-size="38" font-weight="700">78.0%</text>
+    <text x="672" y="344" fill="#6B6257" font-family="Arial, sans-serif" font-size="15">Secondary peak: 64.0%</text>
+  </g>
+  <g>
+    <rect x="930" y="242" width="260" height="112" rx="22" fill="#FFFDF9" stroke="#E0D3C4"/>
+    <text x="954" y="278" fill="#6B6257" font-family="Arial, sans-serif" font-size="14" font-weight="700">PROJECT COVERAGE</text>
+    <text x="954" y="322" fill="#1F1C1A" font-family="Arial, sans-serif" font-size="38" font-weight="700">11</text>
+    <text x="954" y="344" fill="#6B6257" font-family="Arial, sans-serif" font-size="15">Top bucket: Shared Workspace</text>
+  </g>
+
+  <rect x="56" y="384" width="760" height="196" rx="24" fill="#FFF8EF" stroke="#D8C8B6"/>
+  <text x="84" y="422" fill="#1F1C1A" font-family="Georgia, serif" font-size="28" font-weight="700">Usage Reference</text>
+  <text x="642" y="422" fill="#6B6257" font-family="Arial, sans-serif" font-size="15">Harder signals first</text>
+  <circle cx="96" cy="458" r="5" fill="#B55233"/>
+  <text x="114" y="464" fill="#1F1C1A" font-family="Arial, sans-serif" font-size="17"><tspan font-weight="700">xhigh</tspan><tspan> accounts for 71.3% of measured tokens.</tspan></text>
+  <circle cx="96" cy="498" r="5" fill="#B55233"/>
+  <text x="114" y="504" fill="#1F1C1A" font-family="Arial, sans-serif" font-size="17">Subagents were used in 21 sessions and drive most of the burn.</text>
+  <circle cx="96" cy="538" r="5" fill="#B55233"/>
+  <text x="114" y="544" fill="#1F1C1A" font-family="Arial, sans-serif" font-size="17">Project attribution is mixed, so usage sections matter more than advice.</text>
+
+  <rect x="838" y="384" width="386" height="196" rx="24" fill="#FFF8EF" stroke="#D8C8B6"/>
+  <text x="866" y="422" fill="#1F1C1A" font-family="Georgia, serif" font-size="28" font-weight="700">Repeated Expensive Patterns</text>
+  <rect x="866" y="446" width="330" height="32" rx="10" fill="#F3E6D8"/>
+  <text x="882" y="467" fill="#6B6257" font-family="Arial, sans-serif" font-size="14" font-weight="700">PROJECT</text>
+  <text x="1022" y="467" fill="#6B6257" font-family="Arial, sans-serif" font-size="14" font-weight="700">TASK</text>
+  <text x="1120" y="467" fill="#6B6257" font-family="Arial, sans-serif" font-size="14" font-weight="700">TOKENS</text>
+  <text x="882" y="510" fill="#1F1C1A" font-family="Arial, sans-serif" font-size="16">Shared Workspace</text>
+  <text x="1022" y="510" fill="#1F1C1A" font-family="Arial, sans-serif" font-size="16">Build</text>
+  <text x="1120" y="510" fill="#1F1C1A" font-family="Arial, sans-serif" font-size="16">31.2M</text>
+  <line x1="866" y1="526" x2="1196" y2="526" stroke="#E0D3C4"/>
+  <text x="882" y="556" fill="#1F1C1A" font-family="Arial, sans-serif" font-size="16">Internal Project</text>
+  <text x="1022" y="556" fill="#1F1C1A" font-family="Arial, sans-serif" font-size="16">Review</text>
+  <text x="1120" y="556" fill="#1F1C1A" font-family="Arial, sans-serif" font-size="16">22.8M</text>
+
+  <rect x="56" y="604" width="560" height="196" rx="24" fill="#FFF8EF" stroke="#D8C8B6"/>
+  <text x="84" y="642" fill="#1F1C1A" font-family="Georgia, serif" font-size="28" font-weight="700">Project Usage</text>
+  <rect x="84" y="666" width="504" height="32" rx="10" fill="#F3E6D8"/>
+  <text x="100" y="687" fill="#6B6257" font-family="Arial, sans-serif" font-size="14" font-weight="700">PROJECT</text>
+  <text x="320" y="687" fill="#6B6257" font-family="Arial, sans-serif" font-size="14" font-weight="700">SESSIONS</text>
+  <text x="430" y="687" fill="#6B6257" font-family="Arial, sans-serif" font-size="14" font-weight="700">TOKENS</text>
+  <text x="100" y="730" fill="#1F1C1A" font-family="Arial, sans-serif" font-size="16">Shared Workspace</text>
+  <text x="320" y="730" fill="#1F1C1A" font-family="Arial, sans-serif" font-size="16">18</text>
+  <text x="430" y="730" fill="#1F1C1A" font-family="Arial, sans-serif" font-size="16">41.8M</text>
+  <line x1="84" y1="744" x2="588" y2="744" stroke="#E0D3C4"/>
+  <text x="100" y="774" fill="#1F1C1A" font-family="Arial, sans-serif" font-size="16">Internal Project</text>
+  <text x="320" y="774" fill="#1F1C1A" font-family="Arial, sans-serif" font-size="16">9</text>
+  <text x="430" y="774" fill="#1F1C1A" font-family="Arial, sans-serif" font-size="16">28.4M</text>
+
+  <rect x="638" y="604" width="586" height="196" rx="24" fill="#FFF8EF" stroke="#D8C8B6"/>
+  <text x="666" y="642" fill="#1F1C1A" font-family="Georgia, serif" font-size="28" font-weight="700">Recent Sessions</text>
+  <rect x="666" y="668" width="132" height="30" rx="15" fill="#F5D8C5"/>
+  <rect x="808" y="668" width="110" height="30" rx="15" fill="#F7EFE5"/>
+  <rect x="928" y="668" width="96" height="30" rx="15" fill="#F7EFE5"/>
+  <text x="708" y="688" text-anchor="middle" fill="#B55233" font-family="Arial, sans-serif" font-size="14" font-weight="700">All</text>
+  <text x="863" y="688" text-anchor="middle" fill="#6B6257" font-family="Arial, sans-serif" font-size="14" font-weight="700">Agents</text>
+  <text x="976" y="688" text-anchor="middle" fill="#6B6257" font-family="Arial, sans-serif" font-size="14" font-weight="700">Xhigh</text>
+  <rect x="666" y="716" width="530" height="18" rx="9" fill="#F7EFE5"/>
+  <rect x="666" y="752" width="530" height="1" fill="#E0D3C4"/>
+  <rect x="666" y="772" width="310" height="10" rx="5" fill="#D7C7B8"/>
+  <rect x="1000" y="770" width="92" height="14" rx="7" fill="#F2DCC8"/>
+  <rect x="1108" y="770" width="60" height="14" rx="7" fill="#E5EFE8"/>
+</svg>
