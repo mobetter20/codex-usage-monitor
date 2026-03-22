@@ -1,8 +1,8 @@
 # Codex Usage Monitor
 
-Local dashboard for inspecting where your Codex usage appears to be going.
+Local dashboard for seeing where your Codex usage is concentrating by project, task type, and setup.
 
-Codex already shows overall usage. This tool adds a clearer local view of:
+Codex already shows overall usage. This adds a more decision-useful local view of:
 
 - project mix
 - repeated expensive patterns
@@ -18,6 +18,8 @@ For example, it can make patterns visible like:
 - one project quietly consuming most of your tokens
 - `xhigh` and subagents dominating a specific task type
 - heavy sessions clustering on a single day
+
+If the native usage board tells you total pressure, this tool is meant to answer where that pressure is actually coming from.
 
 ![Sanitized dashboard preview](assets/dashboard-preview.svg)
 
