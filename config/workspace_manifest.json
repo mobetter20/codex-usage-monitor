@@ -1,0 +1,157 @@
+{
+  "schema_version": "codex-housekeeping/v1",
+  "workspace_root_marker": ".codex-workspace-root",
+  "durable_zones": [
+    "work",
+    "personal"
+  ],
+  "allowed_top_level": [
+    ".codex-workspace-root",
+    ".DS_Store",
+    "GIT-SAFEGUARD.md",
+    "README.md",
+    "WORKLOG.md",
+    "personal",
+    "scratch",
+    "tmp",
+    "work"
+  ],
+  "worktree_roots": [
+    "scratch/worktrees"
+  ],
+  "repo_defaults": {
+    "checks": {
+      "tracked_changes": "warn",
+      "ahead": "warn",
+      "behind": "warn",
+      "untracked": "warn"
+    },
+    "ignore_untracked": [
+      ".DS_Store"
+    ]
+  },
+  "workspace_path_audit": {
+    "fail": [
+      "README.md",
+      "GIT-SAFEGUARD.md"
+    ],
+    "warn": [
+      "WORKLOG.md"
+    ]
+  },
+  "repos": [
+    {
+      "id": "logistics_news_pipeline",
+      "root": "work/logistics-news-briefing-pipeline",
+      "class": "automation",
+      "checks": {
+        "tracked_changes": "fail",
+        "ahead": "warn",
+        "behind": "warn",
+        "untracked": "warn"
+      },
+      "operational_path_files": [],
+      "migratable_path_files": [
+        "editorial_intelligence/data/state/authored-drafts.jsonl",
+        "news_pipeline/output/state.json"
+      ]
+    },
+    {
+      "id": "logistics_monitoring_board",
+      "root": "work/logistics-monitoring-board",
+      "class": "published_target",
+      "checks": {
+        "tracked_changes": "fail",
+        "ahead": "warn",
+        "behind": "warn",
+        "untracked": "warn"
+      },
+      "operational_path_files": [],
+      "migratable_path_files": []
+    },
+    {
+      "id": "codex_usage_monitor",
+      "root": "work/codex-usage-monitor",
+      "class": "control_plane",
+      "checks": {
+        "tracked_changes": "warn",
+        "ahead": "warn",
+        "behind": "warn",
+        "untracked": "warn"
+      },
+      "operational_path_files": [
+        "launchd/com.example.codex-usage-monitor.plist",
+        "scripts/run_codex_usage_monitor.sh"
+      ],
+      "migratable_path_files": [
+        "docs/workspace-housekeeping-os.md"
+      ]
+    },
+    {
+      "id": "thinkpad_remote_ops",
+      "root": "work/thinkpad-remote-ops",
+      "class": "ops",
+      "checks": {
+        "tracked_changes": "warn",
+        "ahead": "warn",
+        "behind": "warn",
+        "untracked": "warn"
+      },
+      "operational_path_files": [],
+      "migratable_path_files": []
+    },
+    {
+      "id": "journal",
+      "root": "personal/Journal",
+      "class": "personal",
+      "checks": {
+        "tracked_changes": "warn",
+        "ahead": "warn",
+        "behind": "warn",
+        "untracked": "warn"
+      },
+      "ignore_untracked": [
+        ".stfolder",
+        ".stfolder/**"
+      ],
+      "operational_path_files": [],
+      "migratable_path_files": []
+    },
+    {
+      "id": "personal_calendar",
+      "root": "personal/personal_calendar",
+      "class": "personal",
+      "checks": {
+        "tracked_changes": "warn",
+        "ahead": "warn",
+        "behind": "warn",
+        "untracked": "warn"
+      },
+      "operational_path_files": [],
+      "migratable_path_files": []
+    },
+    {
+      "id": "garmin_activity",
+      "root": "personal/garmin_activity",
+      "class": "personal",
+      "checks": {
+        "tracked_changes": "warn",
+        "ahead": "warn",
+        "behind": "warn",
+        "untracked": "warn"
+      },
+      "operational_path_files": [],
+      "migratable_path_files": []
+    }
+  ],
+  "contracts": [
+    {
+      "id": "publish_signals_board",
+      "source_repo_id": "logistics_news_pipeline",
+      "target_repo_ids": [
+        "logistics_monitoring_board"
+      ],
+      "notes": "Shared board publish mutates the sibling hosted board repo."
+    }
+  ]
+}

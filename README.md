@@ -104,6 +104,37 @@ The launchd template uses port `8769` by default so it stays separate from ad ho
 
 The template is intentionally localhost-only.
 
+## Workspace Housekeeping
+
+This repo also hosts the workspace housekeeping control plane for a multi-project Codex workspace.
+
+The housekeeping CLI is intentionally read-only in its first version. It helps answer:
+
+- which durable repos exist and which are still unregistered?
+- are any automation-owning repos dirty in ways that should block trust?
+- are worktrees appearing in the wrong places?
+- which absolute workspace-root paths are still encoded in operational files versus docs/state?
+
+Core commands:
+
+```bash
+python3 scripts/hk.py discover --workspace-root ../..
+python3 scripts/hk.py audit --workspace-root ../..
+python3 scripts/hk.py review --workspace-root ../..
+```
+
+The machine-only manifest lives at `config/workspace_manifest.json`.
+
+- `discover` finds registered repos, unregistered repos, candidate durable folders, and worktrees
+- `audit` applies the manifest's repo-specific noise policy and narrow path checks
+- `review` groups findings into `Fix Now`, `Decide This Week`, and `Ignore For Now`
+
+The legacy audit entrypoint is still available for one compatibility cycle:
+
+```bash
+python3 scripts/workspace_housekeeping.py --workspace-root ../..
+```
+
 ## Notes
 
 - Python standard library only. No extra dependencies.
